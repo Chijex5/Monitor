@@ -164,6 +164,7 @@
         // Fetch stats from backend
         async function fetchStats() {
             const startTime = Date.now(); // Start time for response time measurement
+            alert(`started by ${startTime}`)
             try {
                 const response = await fetch(BACKEND_URL);
 
