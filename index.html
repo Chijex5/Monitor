@@ -144,122 +144,101 @@
     </div>
 
     <script>
-        alert()
-        const BACKEND_URL = 'https://chijex5-backend2-1.onrender.com/stats'; // Replace with actual backend URL
-        const responseTimeData = []; // To store response times for the chart
-        const manualTriggerButton = document.getElementById('fetch-manual');
+        document.addEventListener('DOMContentLoaded', () => {
+    const BACKEND_URL = 'https://chijex5-backend2-1.onrender.com/stats'; // Replace with actual backend URL
+    const responseTimeData = [];
+    const manualTriggerButton = document.getElementById('fetch-manual');
 
-        // Initialize Chart.js
-        const ctx = document.getElementById('responseTimeChart').getContext('2d');
-        const responseTimeChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [], // Timestamps
-                datasets: [{
-                    label: 'Response Time (ms)',
-                    data: responseTimeData,
-                    borderColor: '#007BFF',
-                    backgroundColor: 'rgba(0, 123, 255, 0.2)',
-                    fill: true,
-                    tension: 0.3
-                }]
+    // Initialize Chart.js
+    const ctx = document.getElementById('responseTimeChart')?.getContext('2d');
+    const responseTimeChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Response Time (ms)',
+                data: responseTimeData,
+                borderColor: '#007BFF',
+                backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                fill: true,
+                tension: 0.3,
+            }],
+        },
+        options: {
+            scales: {
+                x: {
+                    type: 'time',
+                    time: { unit: 'second' },
+                    title: { display: true, text: 'Time' },
+                },
+                y: {
+                    title: { display: true, text: 'Response Time (ms)' },
+                },
             },
-            options: {
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: {
-                            unit: 'second'
-                        },
-                        title: {
-                            display: true,
-                            text: 'Time'
-                        }
-                    },
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Response Time (ms)'
-                        }
-                    }
-                }
-            }
-        });
+        },
+    });
 
-        // Fetch stats from backend
-        async function fetchStats() {
-            manualTriggerButton.disabled = true; // Disable button while fetching
-            const startTime = Date.now(); // Start time for response time measurement
+    let isFetching = false;
 
-            try {
-                const response = await fetch(BACKEND_URL);
+    async function fetchStats() {
+        if (isFetching) return;
+        isFetching = true;
+        manualTriggerButton?.setAttribute('disabled', true);
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
+        const startTime = Date.now();
 
-                const data = await response.json();
-                const endTime = Date.now(); // End time for response time measurement
+        try {
+            const response = await fetch(BACKEND_URL);
+            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
 
-                // Update total requests
-                document.getElementById('total-requests').innerText = `Total Requests: ${data.total_requests}`;
+            const data = await response.json();
+            const endTime = Date.now();
 
-                // Update routes table
-                const routeStats = document.getElementById('route-stats');
-                routeStats.innerHTML = ''; // Clear existing rows
-                for (const route of Object.keys(data.routes)) {
-                    const row = `
-                        <tr>
-                            <td>${route}</td>
-                            <td>${data.routes[route]}</td>
-                        </tr>
-                    `;
-                    routeStats.innerHTML += row;
-                }
+            // Update UI elements
+            document.getElementById('total-requests').innerText = `Total Requests: ${data.total_requests}`;
+            const routeStats = document.getElementById('route-stats');
+            routeStats.innerHTML = Object.keys(data.routes)
+                .map(route => `<tr><td>${route}</td><td>${data.routes[route]}</td></tr>`)
+                .join('');
 
-                // Update backend status to OK
-                const backendStatus = document.getElementById('backend-status');
-                backendStatus.innerText = 'Backend is Online';
-                backendStatus.classList.remove('error');
-                backendStatus.classList.add('ok');
+            const backendStatus = document.getElementById('backend-status');
+            backendStatus.innerText = 'Backend is Online';
+            backendStatus.classList.remove('error');
+            backendStatus.classList.add('ok');
 
-                // Calculate response time and update chart
-                const responseTime = endTime - startTime; // Response time in milliseconds
-                updateResponseTimeChart(responseTime);
-            } catch (error) {
-                console.error('Error fetching stats:', error);
+            // Update chart
+            const responseTime = endTime - startTime;
+            updateResponseTimeChart(responseTime);
+        } catch (error) {
+            console.error('Error fetching stats:', error);
 
-                // Show error message
-                const backendStatus = document.getElementById('backend-status');
-                backendStatus.innerText = 'Error: Unable to connect to the backend!';
-                backendStatus.classList.remove('ok');
-                backendStatus.classList.add('error');
-            } finally {
-                manualTriggerButton.disabled = false; // Re-enable button
-            }
+            const backendStatus = document.getElementById('backend-status');
+            backendStatus.innerText = 'Error: Unable to connect to the backend!';
+            backendStatus.classList.remove('ok');
+            backendStatus.classList.add('error');
+        } finally {
+            isFetching = false;
+            manualTriggerButton?.removeAttribute('disabled');
+        }
+    }
+
+    function updateResponseTimeChart(responseTime) {
+        const now = new Date();
+        responseTimeChart.data.labels.push(now);
+        responseTimeChart.data.datasets[0].data.push(responseTime);
+
+        if (responseTimeChart.data.labels.length > 20) {
+            responseTimeChart.data.labels.shift();
+            responseTimeChart.data.datasets[0].data.shift();
         }
 
-        // Update the response time chart
-        function updateResponseTimeChart(responseTime) {
-            const now = new Date();
-            responseTimeChart.data.labels.push(now); // Add current time to labels
-            responseTimeChart.data.datasets[0].data.push(responseTime); // Add response time to dataset
+        responseTimeChart.update();
+    }
 
-            // Limit data points to the last 20 entries
-            if (responseTimeChart.data.labels.length > 20) {
-                responseTimeChart.data.labels.shift();
-                responseTimeChart.data.datasets[0].data.shift();
-            }
-
-            responseTimeChart.update(); // Update the chart
-        }
-
-        // Add event listener to the manual trigger button
-        manualTriggerButton.addEventListener('click', fetchStats);
-
-        // Periodically fetch stats every 5 seconds
-        setInterval(fetchStats, 5000);
-        fetchStats(); // Initial fetch
+    manualTriggerButton?.addEventListener('click', fetchStats);
+    setInterval(fetchStats, 5000);
+    fetchStats(); // Initial fetch
+});
     </script>
 </body>
 </html>
