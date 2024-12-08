@@ -84,6 +84,26 @@
         .chart-container canvas {
             max-width: 100%;
         }
+
+        .manual-trigger {
+            margin: 20px 0;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .manual-trigger:hover {
+            background-color: #0056b3;
+        }
+
+        .manual-trigger:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -113,6 +133,9 @@
         <!-- Backend Status -->
         <p class="status" id="backend-status">Checking backend status...</p>
 
+        <!-- Manual Trigger Button -->
+        <button class="manual-trigger" id="fetch-manual">Fetch Now</button>
+
         <!-- Response Time Chart -->
         <div class="chart-container">
             <h3>Response Times</h3>
@@ -123,6 +146,7 @@
     <script>
         const BACKEND_URL = 'https://chijex5-backend2-1.onrender.com/stats'; // Replace with actual backend URL
         const responseTimeData = []; // To store response times for the chart
+        const manualTriggerButton = document.getElementById('fetch-manual');
 
         // Initialize Chart.js
         const ctx = document.getElementById('responseTimeChart').getContext('2d');
@@ -163,8 +187,9 @@
 
         // Fetch stats from backend
         async function fetchStats() {
+            manualTriggerButton.disabled = true; // Disable button while fetching
             const startTime = Date.now(); // Start time for response time measurement
-            alert(`started by ${startTime}`)
+
             try {
                 const response = await fetch(BACKEND_URL);
 
@@ -208,6 +233,8 @@
                 backendStatus.innerText = 'Error: Unable to connect to the backend!';
                 backendStatus.classList.remove('ok');
                 backendStatus.classList.add('error');
+            } finally {
+                manualTriggerButton.disabled = false; // Re-enable button
             }
         }
 
@@ -225,6 +252,9 @@
 
             responseTimeChart.update(); // Update the chart
         }
+
+        // Add event listener to the manual trigger button
+        manualTriggerButton.addEventListener('click', fetchStats);
 
         // Periodically fetch stats every 5 seconds
         setInterval(fetchStats, 5000);
