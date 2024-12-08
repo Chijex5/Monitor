@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Real-Time Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Global Styles */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            margin: 20px 0;
+            color: #444;
+        }
+
+        .dashboard {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            text-align: center;
+            width: 90%;
+            max-width: 800px;
+        }
+
+        .stats {
+            margin-bottom: 20px;
+        }
+
+        .stats p {
+            font-size: 22px;
+            margin: 10px 0;
+        }
+
+        .routes {
+            margin-top: 20px;
+        }
+
+        .routes table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .routes th, .routes td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+
+        .routes th {
+            background-color: #007BFF;
+            color: white;
+        }
+
+        .status {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+
+        .status.ok {
+            color: #28a745;
+        }
+
+        .status.error {
+            color: #ff4d4f;
+        }
+
+        .chart-container {
+            margin-top: 20px;
+        }
+
+        .chart-container canvas {
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>API Real-Time Dashboard</h1>
+    <div class="dashboard">
+        <!-- Total Requests -->
+        <div class="stats">
+            <p id="total-requests">Total Requests: Loading...</p>
+        </div>
+
+        <!-- Route Table -->
+        <div class="routes">
+            <h3>Routes Accessed</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Route</th>
+                        <th>Request Count</th>
+                    </tr>
+                </thead>
+                <tbody id="route-stats">
+                    <!-- Dynamically populated rows -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Backend Status -->
+        <p class="status" id="backend-status">Checking backend status...</p>
+
+        <!-- Response Time Chart -->
+        <div class="chart-container">
+            <h3>Response Times</h3>
+            <canvas id="responseTimeChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const BACKEND_URL = 'http://localhost:5000/stats'; // Replace with actual backend URL
+        const responseTimeData = []; // To store response times for the chart
+
+        // Initialize Chart.js
+        const ctx = document.getElementById('responseTimeChart').getContext('2d');
+        const responseTimeChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [], // Timestamps
+                datasets: [{
+                    label: 'Response Time (ms)',
+                    data: responseTimeData,
+                    borderColor: '#007BFF',
+                    backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'second'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Response Time (ms)'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Fetch stats from backend
+        async function fetchStats() {
+            const startTime = Date.now(); // Start time for response time measurement
+            try {
+                const response = await fetch(BACKEND_URL);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const endTime = Date.now(); // End time for response time measurement
+
+                // Update total requests
+                document.getElementById('total-requests').innerText = `Total Requests: ${data.total_requests}`;
+
+                // Update routes table
+                const routeStats = document.getElementById('route-stats');
+                routeStats.innerHTML = ''; // Clear existing rows
+                for (const route of Object.keys(data.routes)) {
+                    const row = `
+                        <tr>
+                            <td>${route}</td>
+                            <td>${data.routes[route]}</td>
+                        </tr>
+                    `;
+                    routeStats.innerHTML += row;
+                }
+
+                // Update backend status to OK
+                const backendStatus = document.getElementById('backend-status');
+                backendStatus.innerText = 'Backend is Online';
+                backendStatus.classList.remove('error');
+                backendStatus.classList.add('ok');
+
+                // Calculate response time and update chart
+                const responseTime = endTime - startTime; // Response time in milliseconds
+                updateResponseTimeChart(responseTime);
+            } catch (error) {
+                console.error('Error fetching stats:', error);
+
+                // Show error message
+                const backendStatus = document.getElementById('backend-status');
+                backendStatus.innerText = 'Error: Unable to connect to the backend!';
+                backendStatus.classList.remove('ok');
+                backendStatus.classList.add('error');
+            }
+        }
+
+        // Update the response time chart
+        function updateResponseTimeChart(responseTime) {
+            const now = new Date();
+            responseTimeChart.data.labels.push(now); // Add current time to labels
+            responseTimeChart.data.datasets[0].data.push(responseTime); // Add response time to dataset
+
+            // Limit data points to the last 20 entries
+            if (responseTimeChart.data.labels.length > 20) {
+                responseTimeChart.data.labels.shift();
+                responseTimeChart.data.datasets[0].data.shift();
+            }
+
+            responseTimeChart.update(); // Update the chart
+        }
+
+        // Periodically fetch stats every 5 seconds
+        setInterval(fetchStats, 5000);
+        fetchStats(); // Initial fetch
+    </script>
+</body>
+</html>
