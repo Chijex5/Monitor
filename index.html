@@ -4,328 +4,67 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>API Real-Time Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f2f5;
-            color: #333;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            min-height: 100vh;
-        }
-
-        h1 {
-            margin: 20px 0;
-            color: #444;
-        }
-
-        .dashboard {
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            text-align: center;
-            width: 90%;
-            max-width: 900px;
-            margin-bottom: 20px;
-        }
-
-        .stats, .matrix {
-            margin-bottom: 20px;
-        }
-
-        .stats p {
-            font-size: 22px;
-            margin: 10px 0;
-        }
-
-        .routes table, .matrix table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .routes th, .routes td, .matrix th, .matrix td {
-            border: 1px solid #ddd;
-            padding: 10px;
-            text-align: left;
-        }
-
-        .routes th, .matrix th {
-            background-color: #007BFF;
-            color: white;
-        }
-
-        .status {
-            margin-top: 20px;
-            font-size: 18px;
-        }
-
-        .status.ok {
-            color: #28a745;
-        }
-
-        .status.error {
-            color: #ff4d4f;
-        }
-
-        .chart-container {
-            margin-top: 20px;
-        }
-
-        .chart-container canvas {
-            max-width: 100%;
-        }
-
-        .manual-trigger {
-            margin: 20px 0;
-            padding: 10px 20px;
-            background-color: #007BFF;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        .manual-trigger:hover {
-            background-color: #0056b3;
-        }
-
-        .manual-trigger:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-
-        .error-log {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-            border-radius: 8px;
-            padding: 10px;
-            margin-top: 20px;
-            text-align: left;
-            max-width: 90%;
-            word-wrap: break-word;
-        }
-
-        .error-log h3 {
-            margin-top: 0;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <h1>API Real-Time Dashboard</h1>
+    <p class="status" id="backend-status">Checking backend status...</p>
     <div class="dashboard">
         <!-- Total Requests -->
-        <div class="stats">
-            <p id="total-requests">Total Requests: Loading...</p>
+        <div class="card">
+            <p id="request-p">Total Requests: <div id="total-requests">Loading...</div></p>
         </div>
 
         <!-- Route Table -->
-        <div class="routes">
-            <h3>Routes Accessed</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Route</th>
-                        <th>Request Count</th>
-                    </tr>
-                </thead>
-                <tbody id="route-stats">
-                    <!-- Dynamically populated rows -->
-                </tbody>
-            </table>
+        <div class="card">
+            <p id="request-p">Routes Accessed</p>
+            <div class="stat-display">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Route</th>
+                            <th>Request Count</th>
+                        </tr>
+                    </thead>
+                    <tbody id="route-stats">
+                        <!-- Dynamically populated rows -->
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <!-- Matrix Table -->
-        <div class="matrix">
-            <h3>Route Matrix</h3>
-            <table id="route-matrix">
-                <thead>
-                    <tr>
-                        <th>Route</th>
-                        <th>Last Access Time</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Dynamically populated rows -->
-                </tbody>
-            </table>
+        <div class="card">
+            <p id="request-p">Route Matrix</p>
+            <div class="stat-display">
+                <table id="route-matrix">
+                    <thead>
+                        <tr>
+                            <th>Route</th>
+                            <th>Last Access Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Dynamically populated rows -->
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <!-- Backend Status -->
-        <p class="status" id="backend-status">Checking backend status...</p>
-
-        <!-- Manual Trigger Button -->
-        <button class="manual-trigger" id="fetch-manual">Fetch Now</button>
-
-        <!-- Response Time Chart -->
-        <div class="chart-container">
-            <h3>Response Times</h3>
-            <canvas id="responseTimeChart"></canvas>
-        </div>
-
-        <!-- Error and Warning Log -->
-        <div class="error-log" id="error-log">
-            <h3>Error and Warning Log</h3>
-            <ul id="error-messages">
-                <!-- Dynamically added error messages -->
-            </ul>
-        </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-    const BACKEND_URL = 'https://chijex5-backend2-1.onrender.com/stats'; // Replace with actual backend URL
-    const responseTimeData = [];
-    const manualTriggerButton = document.getElementById('fetch-manual');
-    const errorLog = document.getElementById('error-messages');
-    const routeMatrixTable = document.getElementById('route-matrix').querySelector('tbody');
-
-    // Initialize Chart.js
-    const ctx = document.getElementById('responseTimeChart')?.getContext('2d');
-    const responseTimeChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: 'Response Time (ms)',
-                data: responseTimeData,
-                borderColor: '#007BFF',
-                backgroundColor: 'rgba(0, 123, 255, 0.2)',
-                fill: true,
-                tension: 0.3,
-            }],
-        },
-        options: {
-            scales: {
-                x: {
-                    type: 'time',
-                    time: { unit: 'second' },
-                    title: { display: true, text: 'Time' },
-                },
-                y: {
-                    title: { display: true, text: 'Response Time (ms)' },
-                },
-            },
-        },
-    });
-
-    function logMessage(type, message) {
-        const li = document.createElement('li');
-        li.textContent = `[${type}] ${message}`;
-        errorLog.appendChild(li);
-    }
-
-    // Capture JavaScript errors
-    window.onerror = function (message, source, lineno, colno, error) {
-        logMessage('Error', `Error: ${message} at ${source}:${lineno}:${colno}`);
-        return true; // Prevent default error handling
-    };
-
-    // Capture warnings
-    const originalWarn = console.warn;
-    console.warn = function (...args) {
-        logMessage('Warning', args.join(' '));
-        originalWarn.apply(console, args);
-    };
-
-    let isFetching = false;
-
-    async function fetchStats() {
-        logMessage('Info', 'fetchStats is running...');
-        if (isFetching) {
-            logMessage('Warning', 'fetchStats is already in progress.');
-            return;
-        }
-        isFetching = true;
-        manualTriggerButton?.setAttribute('disabled', true);
-
-        const startTime = Date.now();
-
-        try {
-            const response = await fetch(BACKEND_URL);
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            const endTime = Date.now();
-
-            // Update UI elements
-            document.getElementById('total-requests').innerText = `Total Requests: ${data.total_requests}`;
-            const routeStats = document.getElementById('route-stats');
-            routeStats.innerHTML = Object.keys(data.routes)
-                .map(route => `<tr><td>${route}</td><td>${data.routes[route]}</td></tr>`)
-                .join('');
-
-            const backendStatus = document.getElementById('backend-status');
-            backendStatus.innerText = 'Backend is Online';
-            backendStatus.classList.remove('error');
-            backendStatus.classList.add('ok');
-
-            // Update chart
-            const responseTime = endTime - startTime;
-            updateResponseTimeChart(responseTime);
-
-            // Update route matrix
-            updateRouteMatrix(data.routes);
-
-            logMessage('Info', 'fetchStats completed successfully.');
-        } catch (error) {
-            logMessage('Error', `Error in fetchStats: ${error.message}`);
-
-            const backendStatus = document.getElementById('backend-status');
-            backendStatus.innerText = 'Error: Unable to connect to the backend!';
-            backendStatus.classList.remove('ok');
-            backendStatus.classList.add('error');
-        } finally {
-            isFetching = false;
-            manualTriggerButton?.removeAttribute('disabled');
-        }
-    }
-
-    function updateResponseTimeChart(responseTime) {
-        logMessage('Info', 'updateResponseTimeChart is running...');
-        const now = new Date();
-        responseTimeChart.data.labels.push(now);
-        responseTimeChart.data.datasets[0].data.push(responseTime);
-
-        if (responseTimeChart.data.labels.length > 20) {
-            responseTimeChart.data.labels.shift();
-            responseTimeChart.data.datasets[0].data.shift();
-        }
-
-        responseTimeChart.update();
-        logMessage('Info', 'updateResponseTimeChart completed.');
-    }
-
-    function updateRouteMatrix(routes) {
-        logMessage('Info', 'updateRouteMatrix is running...');
-        routeMatrixTable.innerHTML = Object.entries(routes)
-            .map(([route, count]) => `<tr><td>${route}</td><td>${new Date().toLocaleTimeString()}</td></tr>`)
-            .join('');
-        logMessage('Info', 'updateRouteMatrix completed.');
-    }
-
-    manualTriggerButton?.addEventListener('click', () => {
-        logMessage('Info', 'Manual trigger button clicked.');
-        fetchStats();
-    });
-
-    setInterval(() => {
-        logMessage('Info', 'Auto-fetch triggered.');
-        fetchStats();
-    }, 5000);
-
-    logMessage('Info', 'Initial fetch triggered.');
-    fetchStats(); // Initial fetch
-});
-    </script>
+        <!-- Response Time Chart -->
+        <div class="card chart-container">
+            <h3>Response Times</h3>
+            <div class="chart-stats">
+                <p>Average Response Time: <span id="avg-response-time">Calculating...</span></p>
+                <p>Max Response Time: <span id="max-response-time">Calculating...</span></p>
+                <p>Min Response Time: <span id="min-response-time">Calculating...</span></p>
+            </div>
+            <canvas id="responseTimeChart"></canvas>
+        </div>        
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="script.js"></script>
 </body>
 </html>
